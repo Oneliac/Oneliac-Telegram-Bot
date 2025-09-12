@@ -30,6 +30,7 @@ class HealthcareBot:
         self.app.add_handler(CommandHandler("help", self.help_command))
         self.app.add_handler(CommandHandler("health", self.health_check))
         self.app.add_handler(CommandHandler("eligibility", self.eligibility_command))
+        self.app.add_handler(CommandHandler("prescription", self.prescription_command))
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Healthcare Bot - Privacy-Preserving Medical Queries")
@@ -41,6 +42,7 @@ Healthcare Bot Commands:
 /help - Show this help
 /health - Check API status
 /eligibility <patient_id> <procedure> - Check eligibility
+/prescription <patient_id> <drug_code> - Validate prescription
         """
         await update.message.reply_text(help_text)
 
@@ -87,6 +89,42 @@ Healthcare Bot Commands:
                             await update.message.reply_text(f"Patient {patient_id} is ELIGIBLE for {procedure_code}")
                         else:
                             await update.message.reply_text(f"Patient {patient_id} is NOT eligible")
+                    else:
+                        await update.message.reply_text("API Error")
+        except Exception as e:
+            await update.message.reply_text(f"Error: {str(e)}")
+
+    async def prescription_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if len(context.args) < 2:
+            await update.message.reply_text("Usage: /prescription <patient_id> <drug_code>")
+            return
+
+        patient_id = context.args[0]
+        drug_code = context.args[1]
+
+        try:
+            request_data = {
+                "patient_data": {
+                    "patient_id": patient_id,
+                    "encrypted_data": "sample_encrypted_data",
+                    "ipfs_cid": f"Qm{patient_id}Hash",
+                    "data_hash": f"hash_{patient_id}"
+                },
+                "drug_code": drug_code
+            }
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.api_base_url}/validate-prescription",
+                    json=request_data,
+                    headers={"Content-Type": "application/json"}
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if data.get("valid"):
+                            await update.message.reply_text(f"Prescription for {drug_code} is VALID")
+                        else:
+                            await update.message.reply_text(f"Prescription WARNING: {data.get('reason', 'Unknown')}")
                     else:
                         await update.message.reply_text("API Error")
         except Exception as e:
