@@ -8,8 +8,8 @@ Provides secure medical queries through chat interface.
 import asyncio
 import aiohttp
 import os
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 import logging
 
 logging.basicConfig(
@@ -31,14 +31,35 @@ class HealthcareBot:
         self.app.add_handler(CommandHandler("health", self.health_check))
         self.app.add_handler(CommandHandler("eligibility", self.eligibility_command))
         self.app.add_handler(CommandHandler("prescription", self.prescription_command))
+        self.app.add_handler(CallbackQueryHandler(self.button_callback))
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("Healthcare Bot - Privacy-Preserving Medical Queries")
+        keyboard = [
+            [
+                InlineKeyboardButton("Check Eligibility", callback_data="eligibility"),
+                InlineKeyboardButton("Validate Prescription", callback_data="prescription")
+            ],
+            [
+                InlineKeyboardButton("System Status", callback_data="status"),
+                InlineKeyboardButton("Help", callback_data="help")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
+        welcome_text = """
+Healthcare Agents Bot
+
+Welcome to the privacy-preserving healthcare system!
+
+Choose an option below or type a command:
+        """
+
+        await update.message.reply_text(welcome_text, reply_markup=reply_markup)
 
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         help_text = """
 Healthcare Bot Commands:
-/start - Start the bot
+/start - Show main menu
 /help - Show this help
 /health - Check API status
 /eligibility <patient_id> <procedure> - Check eligibility
@@ -129,6 +150,19 @@ Healthcare Bot Commands:
                         await update.message.reply_text("API Error")
         except Exception as e:
             await update.message.reply_text(f"Error: {str(e)}")
+
+    async def button_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        await query.answer()
+
+        if query.data == "eligibility":
+            await query.edit_message_text("Use: /eligibility <patient_id> <procedure_code>")
+        elif query.data == "prescription":
+            await query.edit_message_text("Use: /prescription <patient_id> <drug_code>")
+        elif query.data == "status":
+            await query.edit_message_text("Checking status...")
+        elif query.data == "help":
+            await query.edit_message_text("Use /help to see all commands")
 
     def run(self):
         logger.info("Starting Healthcare Bot...")
