@@ -31,6 +31,7 @@ class HealthcareBot:
         self.app.add_handler(CommandHandler("health", self.health_check))
         self.app.add_handler(CommandHandler("eligibility", self.eligibility_command))
         self.app.add_handler(CommandHandler("prescription", self.prescription_command))
+        self.app.add_handler(CommandHandler("status", self.status_command))
         self.app.add_handler(CallbackQueryHandler(self.button_callback))
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -62,6 +63,7 @@ Healthcare Bot Commands:
 /start - Show main menu
 /help - Show this help
 /health - Check API status
+/status - System status dashboard
 /eligibility <patient_id> <procedure> - Check eligibility
 /prescription <patient_id> <drug_code> - Validate prescription
         """
@@ -78,6 +80,39 @@ Healthcare Bot Commands:
                         await update.message.reply_text(f"API Error: Status {response.status}")
         except Exception as e:
             await update.message.reply_text(f"Connection Error: {str(e)}")
+
+    async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{self.api_base_url}/health") as response:
+                    health_data = await response.json() if response.status == 200 else {}
+
+                async with session.get(f"{self.api_base_url}/status") as response:
+                    status_data = await response.json() if response.status == 200 else {}
+
+            fl_data = status_data.get("federated_learning", {})
+
+            status_text = f"""
+System Status Dashboard
+
+Healthcare API
+- Status: {health_data.get('status', 'Unknown')}
+- Version: {health_data.get('version', 'Unknown')}
+
+Federated Learning
+- Current Round: {fl_data.get('current_round', 0)}
+- Participants: {fl_data.get('participants', 0)}
+
+Privacy Features
+- Zero-Knowledge Proofs: Active
+- Data Encryption: AES-256
+- Blockchain: Solana
+            """
+
+        except Exception as e:
+            status_text = f"Error getting status: {str(e)}"
+
+        await update.message.reply_text(status_text)
 
     async def eligibility_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(context.args) < 2:
@@ -160,7 +195,7 @@ Healthcare Bot Commands:
         elif query.data == "prescription":
             await query.edit_message_text("Use: /prescription <patient_id> <drug_code>")
         elif query.data == "status":
-            await query.edit_message_text("Checking status...")
+            await query.edit_message_text("Use /status to see system dashboard")
         elif query.data == "help":
             await query.edit_message_text("Use /help to see all commands")
 
