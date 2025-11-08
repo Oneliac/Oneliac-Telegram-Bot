@@ -9,7 +9,7 @@ import asyncio
 import aiohttp
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 import logging
 
 logging.basicConfig(
@@ -33,6 +33,7 @@ class HealthcareBot:
         self.app.add_handler(CommandHandler("prescription", self.prescription_command))
         self.app.add_handler(CommandHandler("status", self.status_command))
         self.app.add_handler(CallbackQueryHandler(self.button_callback))
+        self.app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
 
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
@@ -198,6 +199,32 @@ Privacy Features
             await query.edit_message_text("Use /status to see system dashboard")
         elif query.data == "help":
             await query.edit_message_text("Use /help to see all commands")
+
+    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        text = update.message.text.lower()
+
+        if any(word in text for word in ["eligibility", "eligible", "coverage", "insurance"]):
+            await update.message.reply_text(
+                "To check eligibility, use:\n"
+                "/eligibility <patient_id> <procedure_code>"
+            )
+        elif any(word in text for word in ["prescription", "drug", "medication"]):
+            await update.message.reply_text(
+                "To validate a prescription, use:\n"
+                "/prescription <patient_id> <drug_code>"
+            )
+        elif any(word in text for word in ["help", "commands"]):
+            await self.help_command(update, context)
+        elif any(word in text for word in ["status", "health"]):
+            await self.health_check(update, context)
+        else:
+            await update.message.reply_text(
+                "I can help with:\n"
+                "- /eligibility - Check insurance coverage\n"
+                "- /prescription - Validate medications\n"
+                "- /status - System health\n"
+                "- /help - Show all commands"
+            )
 
     def run(self):
         logger.info("Starting Healthcare Bot...")
